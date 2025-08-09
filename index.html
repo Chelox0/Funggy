@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Cultivo de Girgolas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 280px;
+            background: #1a202c; /* gray-900 */
+            color: #e2e8f0; /* gray-200 */
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            transition: width 0.3s ease;
+            position: fixed;
+            height: 100%;
+            overflow-y: auto;
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .sidebar-item:hover, .sidebar-item.active {
+            background-color: #2d3748; /* gray-800 */
+            color: #ffffff;
+        }
+        .main-content {
+            flex-grow: 1;
+            padding: 2rem;
+            margin-left: 280px; /* Same as sidebar width */
+            transition: margin-left 0.3s ease;
+        }
+        .form-container, .table-container, .chart-container, .section-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: background-color 0.3s;
+        }
+        .dark .form-container, .dark .table-container, .dark .chart-container, .dark .section-container {
+            background: #2d3748; /* bg-gray-800 */
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        .modal {
+            background-color: rgba(0, 0, 0, 0.5);
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.2s linear;
+            z-index: 1000;
+        }
+        .modal.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-content {
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            max-width: 28rem;
+            width: 90%;
+            transition: transform 0.3s ease-out;
+            transform: translateY(-20px);
+        }
+        .dark .modal-content {
+             background-color: #1a202c; /* bg-gray-900 */
+        }
+        .modal.active .modal-content {
+            transform: translateY(0);
+        }
+        .dark .table-container::-webkit-scrollbar-thumb {
+            background-color: #4a5568;
+        }
+        .dark .table-container::-webkit-scrollbar-track {
+            background-color: #2d3748;
+        }
+        .chart-container canvas {
+            max-height: 400px;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 0;
+                padding: 1.5rem 0;
+                overflow-x: hidden;
+            }
+            .sidebar.active {
+                width: 280px;
+                padding: 1.5rem;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .main-content.active {
+                margin-left: 280px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="sidebar">
+            <h1 class="text-2xl font-bold text-center mb-6 text-white">Girgolas App</h1>
+            <nav>
+                <ul>
+                    <li id="nav-dashboard" class="sidebar-item active">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
+                        <span>Dashboard</span>
+                    </li>
+                    <li id="nav-inventario" class="sidebar-item">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 00-1 1v2a1 1 0 002 0V3a1 1 0 00-1-1zm0 14a1 1 0 00-1 1v2a1 1 0 102 0v-2a1 1 0 00-1-1zm6.928-11.207a1 1 0 00-.707-.293h-1.036l-2-2a1 1 0 00-1.414 1.414l2 2H15a1 1 0 011 1v12a1 1 0 01-1 1h-6.28a1 1 0 00-.72.324l-3 3a1 1 0 101.414 1.414L10 18.414l2.586 2.586a1 1 0 001.414-1.414l-3-3a1 1 0 00-.72-.324H15a1 1 0 001-1V5a1 1 0 00-.072-.353zM10 9a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 110 2 1 1 0 010-2z"></path></svg>
+                        <span>Inventario</span>
+                    </li>
+                    <li id="nav-cultivo" class="sidebar-item">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l.649-.186.367-1.409a1 1 0 011.838 0l.367 1.409.649.186a1 1 0 001.169-1.409l-7-14z"></path><path d="M11 11a1 1 0 011-1h1.765a1 1 0 01.995.823l.115.865a1 1 0 01-.995 1.177H12a1 1 0 01-1-1v-2z"></path></svg>
+                        <span>Cultivos</span>
+                    </li>
+                    <li id="nav-cosecha" class="sidebar-item">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z"></path></svg>
+                        <span>Cosechas</span>
+                    </li>
+                    <li id="nav-medicion" class="sidebar-item">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M14 6a2 2 0 100 4 2 2 0 000-4zM4 6h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2zm0-4a2 2 0 012-2h8a2 2 0 012 2v2H4V2z"></path></svg>
+                        <span>Mediciones</span>
+                    </li>
+                    <li id="nav-costos" class="sidebar-item">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 0h-3a1 1 0 01-1-1V3h-2v1a1 1 0 01-1 1H4a1 1 0 01-1-1V3h2V2a1 1 0 011-1h2a1 1 0 011 1v1h2V2a1 1 0 011-1h2a1 1 0 011 1v1h2V4zm-1 8a1 1 0 100-2 1 1 0 000 2z"></path></svg>
+                        <span>Costos</span>
+                    </li>
+                    <li id="nav-trazabilidad" class="sidebar-item">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 9a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm-2 4a1 1 0 112 0v1a1 1 0 11-2 0v-1zm4 0a1 1 0 112 0v1a1 1 0 11-2 0v-1z"></path></svg>
+                        <span>Calidad/Trazabilidad</span>
+                    </li>
+                    <li id="nav-notifications" class="sidebar-item">
+                        <div class="relative">
+                            <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-2 2V15a1 1 0 001 1h12a1 1 0 001-1v-1.414l-2-2V8a6 6 0 00-6-6z"></path></svg>
+                            <span id="notification-count" class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">0</span>
+                        </div>
+                        <span>Notificaciones</span>
+                    </li>
+                    <li id="nav-charts" class="sidebar-item">
+                        <svg class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
+                        <span>Gráficos</span>
+                    </li>
+                    <li id="nav-theme" class="sidebar-item mt-4">
+                        <svg id="moon-icon" class="h-5 w-5 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd" d="M9.528 1.723a.75.75 0 0 1 .792-.375 7.5 7.5 0 0 0 8.012 8.012.75.75 0 0 1-.375.792A7.5 7.5 0 0 1 7.155 4.54a.75.75 0 0 1-.996-.17A9 9 0 0 0 9.528 1.723ZM16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" clip-rule="evenodd" />
+                        </svg>
+                        <svg id="sun-icon" class="h-5 w-5 mr-3 hidden" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2.25a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.025 3.536A.75.75 0 0 1 7.6 4.61a7.5 7.5 0 0 0 10.384 10.384.75.75 0 0 1 1.074 1.074A9 9 0 1 1 7.155 4.54a.75.75 0 0 1 .17-.996ZM16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+                        </svg>
+                        <span>Modo Oscuro</span>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main id="main-content" class="main-content p-6">
+            <header class="flex items-center justify-between mb-8">
+                <h2 id="page-title" class="text-3xl font-bold text-gray-800 dark:text-white">Dashboard</h2>
+                <div class="flex items-center space-x-4">
+                    <button id="add-new-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors hidden">Añadir Nuevo</button>
+                    <!-- Dark mode toggle button for smaller screens -->
+                    <button id="theme-toggle-mobile" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors hidden">
+                        <svg id="sun-icon-mobile" class="h-6 w-6 hidden" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2.25a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.025 3.536A.75.75 0 0 1 7.6 4.61a7.5 7.5 0 0 0 10.384 10.384.75.75 0 0 1 1.074 1.074A9 9 0 1 1 7.155 4.54a.75.75 0 0 1 .17-.996ZM16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+                        </svg>
+                        <svg id="moon-icon-mobile" class="h-6 w-6 hidden" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd" d="M9.528 1.723a.75.75 0 0 1 .792-.375 7.5 7.5 0 0 0 8.012 8.012.75.75 0 0 1-.375.792A7.5 7.5 0 0 1 7.155 4.54a.75.75 0 0 1-.996-.17A9 9 0 0 0 9.528 1.723ZM16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <!-- Burger menu for mobile -->
+                    <button id="burger-menu" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors md:hidden">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- All content sections -->
+            <div id="content-views">
+                <!-- Dashboard -->
+                <section id="dashboard-view" class="section-container p-6">
+                    <h3 class="text-xl font-semibold mb-4">Resumen del Dashboard</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Total Cultivos</p>
+                            <p id="total-cultivos" class="text-2xl font-bold mt-1">0</p>
+                        </div>
+                        <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Total Cosechado</p>
+                            <p id="total-cosechado" class="text-2xl font-bold mt-1">0 g</p>
+                        </div>
+                        <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Costo Total</p>
+                            <p id="total-costos" class="text-2xl font-bold mt-1">0 $</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Inventario View -->
+                <section id="inventario-view" class="hidden">
+                    <div class="section-container p-6 mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Gestión de Inventario</h3>
+                        <div class="flex flex-wrap justify-center space-x-2 md:space-x-4 mb-6">
+                            <button id="showInventarioTableBtn" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors mb-2 md:mb-0">Ver Inventario</button>
+                            <button id="showInventarioFormBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors mb-2 md:mb-0">Añadir Insumo</button>
+                            <button id="showMovimientoFormBtn" class="bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 transition-colors mb-2 md:mb-0">Registrar Movimiento</button>
+                        </div>
+
+                        <!-- Formulario de Inventario -->
+                        <form id="inventarioForm" class="hidden">
+                            <h4 class="text-lg font-medium mb-4">Añadir/Editar Insumo</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="insumo-nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre</label>
+                                    <input type="text" id="insumo-nombre" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="insumo-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Insumo</label>
+                                    <select id="insumo-tipo" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                        <option value="fitosanitario">Fitosanitario</option>
+                                        <option value="fertilizante">Fertilizante</option>
+                                        <option value="semilla">Semilla</option>
+                                        <option value="herramienta">Herramienta</option>
+                                        <option value="otro">Otro</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="insumo-stock" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cantidad en Stock</label>
+                                    <input type="number" id="insumo-stock" required min="0" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="insumo-unidad" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Unidad (ej: kg, L, ud)</label>
+                                    <input type="text" id="insumo-unidad" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="insumo-stock-minimo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock Mínimo</label>
+                                    <input type="number" id="insumo-stock-minimo" required min="0" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="insumo-vencimiento" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Vencimiento</label>
+                                    <input type="date" id="insumo-vencimiento" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label for="insumo-imagen" class="block text-sm font-medium text-gray-700 dark:text-gray-300">URL de la Imagen (opcional)</label>
+                                    <input type="text" id="insumo-imagen" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                            </div>
+                            <button type="submit" class="mt-4 w-full bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600">Guardar Insumo</button>
+                        </form>
+                        
+                        <!-- Formulario de Movimiento de Stock -->
+                        <form id="movimientoForm" class="hidden">
+                            <h4 class="text-lg font-medium mb-4">Registrar Movimiento</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="movimiento-insumo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Insumo</label>
+                                    <select id="movimiento-insumo" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                        <option value="">Seleccione un insumo</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="movimiento-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Movimiento</label>
+                                    <select id="movimiento-tipo" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                        <option value="alta">Entrada (Compra)</option>
+                                        <option value="gasto">Salida (Gasto)</option>
+                                        <option value="traslado">Traslado</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="movimiento-cantidad" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cantidad</label>
+                                    <input type="number" id="movimiento-cantidad" required min="1" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="movimiento-fecha" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha</label>
+                                    <input type="date" id="movimiento-fecha" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div id="div-deposito-origen" class="hidden">
+                                    <label for="movimiento-deposito-origen" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Depósito Origen</label>
+                                    <input type="text" id="movimiento-deposito-origen" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div id="div-deposito-destino" class="hidden">
+                                    <label for="movimiento-deposito-destino" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Depósito Destino</label>
+                                    <input type="text" id="movimiento-deposito-destino" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                            </div>
+                            <button type="submit" class="mt-4 w-full bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600">Registrar Movimiento</button>
+                        </form>
+                    </div>
+
+                    <!-- Tabla de Inventario -->
+                    <div id="inventarioTable" class="table-container p-6">
+                        <h4 class="text-xl font-semibold mb-4">Inventario Actual</h4>
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Nombre</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tipo</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stock</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stock Mínimo</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Vencimiento</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventario-body" class="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+                                <!-- Inventory will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                
+                <!-- Cultivos View -->
+                <section id="cultivo-view" class="hidden">
+                    <div class="section-container p-6 mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Añadir Nuevo Cultivo</h3>
+                        <form id="cultivoForm">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <!-- Seccion de Info General -->
+                                <div class="col-span-full mb-4"><h4 class="font-bold text-lg">Información General</h4></div>
+                                <div>
+                                    <label for="cultivo-id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ID del Cultivo</label>
+                                    <input type="text" id="cultivo-id" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="fecha-inicio" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Inicio</label>
+                                    <input type="date" id="fecha-inicio" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="ubicacion" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ubicación</label>
+                                    <input type="text" id="ubicacion" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="especie" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Especie/Variedad</label>
+                                    <input type="text" id="especie" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="cantidad-bolsas" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cantidad de Bolsas</label>
+                                    <input type="number" id="cantidad-bolsas" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="volumen-sustrato" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Volumen de Sustrato (kg)</label>
+                                    <input type="number" step="0.01" id="volumen-sustrato" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                
+                                <!-- Seccion de Preparacion del Sustrato -->
+                                <div class="col-span-full mt-6 mb-4"><h4 class="font-bold text-lg">Preparación del Sustrato</h4></div>
+                                <div>
+                                    <label for="sustrato-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Sustrato</label>
+                                    <input type="text" id="sustrato-tipo" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="sustrato-humedad" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Humedad del Sustrato (%)</label>
+                                    <input type="number" step="0.1" id="sustrato-humedad" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="sustrato-ph" class="block text-sm font-medium text-gray-700 dark:text-gray-300">pH del Sustrato</label>
+                                    <input type="number" step="0.01" id="sustrato-ph" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div class="md:col-span-2 lg:col-span-3">
+                                    <label for="notas-cultivo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notas Adicionales</label>
+                                    <textarea id="notas-cultivo" rows="3" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700"></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="mt-4 w-full bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors">Guardar Cultivo</button>
+                        </form>
+                    </div>
+                    <div id="cultivosTable" class="table-container p-6">
+                        <h3 class="text-xl font-semibold mb-4">Cultivos Registrados</h3>
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ID Cultivo</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fecha Inicio</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ubicación</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cultivos-body" class="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+                                <!-- Cultivos will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Cosechas View -->
+                <section id="cosecha-view" class="hidden">
+                    <div class="section-container p-6 mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Añadir Nueva Cosecha</h3>
+                        <form id="cosechaForm">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="cosecha-id-cultivo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ID del Cultivo</label>
+                                    <input type="text" id="cosecha-id-cultivo" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="cosecha-fecha-cosecha" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Cosecha</label>
+                                    <input type="date" id="cosecha-fecha-cosecha" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="peso-cosecha" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Peso de Cosecha (g)</label>
+                                    <input type="number" step="0.01" id="peso-cosecha" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="calidad" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Calidad</label>
+                                    <select id="calidad" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Excelente">Excelente</option>
+                                        <option value="Buena">Buena</option>
+                                        <option value="Regular">Regular</option>
+                                        <option value="Mala">Mala</option>
+                                    </select>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label for="notas-cosecha" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Notas</label>
+                                    <textarea id="notas-cosecha" rows="2" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700"></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="mt-4 w-full bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600">Guardar Cosecha</button>
+                        </form>
+                    </div>
+                    <div id="cosechasTable" class="table-container p-6">
+                        <h3 class="text-xl font-semibold mb-4">Cosechas Registradas</h3>
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ID Cultivo</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fecha Cosecha</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Peso (g)</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Calidad</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cosechas-body" class="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+                                <!-- Cosechas will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                
+                <!-- Mediciones View -->
+                <section id="medicion-view" class="hidden">
+                    <div class="section-container p-6 mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Añadir Nueva Medición</h3>
+                        <form id="medicionForm">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="medicion-id-cultivo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ID del Cultivo</label>
+                                    <input type="text" id="medicion-id-cultivo" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="fecha-medicion" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Medición</label>
+                                    <input type="date" id="fecha-medicion" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="temperatura" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Temperatura (°C)</label>
+                                    <input type="number" step="0.1" id="temperatura" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="humedad" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Humedad (%)</label>
+                                    <input type="number" step="0.1" id="humedad" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="co2" class="block text-sm font-medium text-gray-700 dark:text-gray-300">CO2 (ppm)</label>
+                                    <input type="number" id="co2" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label for="iluminacion" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Iluminación (horas)</label>
+                                    <input type="number" step="0.1" id="iluminacion" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                                </div>
+                            </div>
+                            <button type="submit" class="mt-4 w-full bg-purple-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-600">Guardar Medición</button>
+                        </form>
+                    </div>
+                    <div id="medicionesTable" class="table-container p-6">
+                        <h3 class="text-xl font-semibold mb-4">Mediciones Registradas</h3>
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ID Cultivo</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fecha Medición</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Temp (°C)</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Humedad (%)</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mediciones-body" class="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+                                <!-- Mediciones will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Costos View -->
+                <section id="costos-view" class="hidden">
+                    <div class="section-container p-6 mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Gestión de Costos</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-lg bg-gray-100 dark:bg-gray-700">
+                                <h4 class="text-lg font-medium mb-2">Costos Fijos</h4>
+                                <form id="fijosForm">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="text" id="costo-fijo-nombre" placeholder="Nombre del costo" class="w-2/3 p-2 rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-white dark:bg-gray-700">
+                                        <input type="number" step="0.01" id="costo-fijo-monto" placeholder="Monto ($)" class="w-1/3 p-2 rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-white dark:bg-gray-700">
+                                    </div>
+                                    <button type="submit" class="mt-2 w-full bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-600">Añadir Costo Fijo</button>
+                                </form>
+                                <ul id="fijos-list" class="mt-4 space-y-2">
+                                    <!-- Costos fijos will be listed here -->
+                                </ul>
+                            </div>
+                            <div class="p-4 rounded-lg bg-gray-100 dark:bg-gray-700">
+                                <h4 class="text-lg font-medium mb-2">Costos Variables (Manual)</h4>
+                                <form id="variablesForm">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="text" id="costo-variable-nombre" placeholder="Nombre del costo" class="w-2/3 p-2 rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-white dark:bg-gray-700">
+                                        <input type="number" step="0.01" id="costo-variable-monto" placeholder="Monto ($)" class="w-1/3 p-2 rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-white dark:bg-gray-700">
+                                    </div>
+                                    <button type="submit" class="mt-2 w-full bg-pink-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-pink-600">Añadir Costo Variable</button>
+                                </form>
+                                <ul id="variables-list" class="mt-4 space-y-2">
+                                    <!-- Costos variables will be listed here -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Calidad/Trazabilidad View -->
+                <section id="trazabilidad-view" class="hidden">
+                    <div class="section-container p-6">
+                        <h3 class="text-xl font-semibold mb-4">Registros de Calidad y Trazabilidad</h3>
+                        <p class="text-gray-600 dark:text-gray-400">Esta sección es para registrar manualmente los datos de control de plagas, labores culturales, aplicaciones de agroquímicos y más. No se generan reportes, pero los datos se almacenan y están disponibles para consulta.</p>
+                        <!-- Aquí se pueden añadir más formularios y tablas según sea necesario -->
+                    </div>
+                </section>
+
+                <!-- Notificaciones View -->
+                <section id="notifications-view" class="hidden section-container p-6">
+                    <h3 class="text-xl font-semibold mb-4">Centro de Notificaciones</h3>
+                    <div id="notifications-list" class="space-y-4">
+                        <!-- Notifications will be inserted here -->
+                    </div>
+                    <p id="no-notifications-message" class="text-center py-4 text-gray-500 dark:text-gray-400 hidden">No hay notificaciones pendientes.</p>
+                </section>
+                
+                <!-- Charts View -->
+                <section id="charts-view" class="hidden chart-container p-6">
+                    <h3 class="text-xl font-semibold mb-4">Gráficos de Mediciones</h3>
+                    <div id="chart-options" class="mb-4">
+                        <label for="chart-cultivo-id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filtrar por ID de Cultivo:</label>
+                        <select id="chart-cultivo-id" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm p-2 bg-white dark:bg-gray-700">
+                            <option value="">Todos los cultivos</option>
+                        </select>
+                    </div>
+                    <div class="relative h-96">
+                        <canvas id="medicionesChart"></canvas>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para notificaciones -->
+    <div id="notificationModal" class="modal fixed inset-0 flex items-center justify-center z-50">
+        <div class="modal-content text-center">
+            <h3 id="modalTitle" class="text-xl font-bold mb-2 text-gray-800 dark:text-white"></h3>
+            <p id="modalMessage" class="text-gray-700 dark:text-gray-300 mb-4"></p>
+            <button id="closeModalBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="text/javascript">
+        // Helper functions
+        const getFromLocalStorage = (key) => JSON.parse(localStorage.getItem(key) || '[]');
+        const saveToLocalStorage = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+        const hideAllViews = () => {
+            document.querySelectorAll('#content-views > section').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+        };
+        const showView = (viewId) => {
+            hideAllViews();
+            document.getElementById(viewId).classList.remove('hidden');
+            document.getElementById(`nav-${viewId.replace('-view', '')}`).classList.add('active');
+            document.getElementById('page-title').textContent = document.querySelector(`#nav-${viewId.replace('-view', '')} span`).textContent;
+            
+            // Handle add new button visibility
+            const addNewBtn = document.getElementById('add-new-btn');
+            addNewBtn.classList.add('hidden');
+            if (viewId === 'inventario-view' || viewId === 'cultivo-view' || viewId === 'cosecha-view' || viewId === 'medicion-view') {
+                addNewBtn.classList.remove('hidden');
+            }
+        };
+
+        const showModal = (title, message, callback = null) => {
+            const modal = document.getElementById('notificationModal');
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            modal.classList.add('active');
+            if (callback) {
+                document.getElementById('closeModalBtn').onclick = () => {
+                    hideModal();
+                    callback();
+                };
+            } else {
+                document.getElementById('closeModalBtn').onclick = hideModal;
+            }
+        };
+        const hideModal = () => document.getElementById('notificationModal').classList.remove('active');
+
+        // ===========================================================================================================================
+        // NAVIGATION & UI LOGIC
+        // ===========================================================================================================================
+
+        document.getElementById('nav-dashboard').addEventListener('click', () => showView('dashboard-view'));
+        document.getElementById('nav-inventario').addEventListener('click', () => {
+            showView('inventario-view');
+            renderInventarioTable();
+            renderMovimientoSelect();
+            document.getElementById('inventarioForm').classList.add('hidden');
+            document.getElementById('inventarioTable').classList.remove('hidden');
+            document.getElementById('movimientoForm').classList.add('hidden');
+        });
+        document.getElementById('nav-cultivo').addEventListener('click', () => {
+            showView('cultivo-view');
+            renderCultivosTable();
+            document.getElementById('cultivoForm').classList.add('hidden');
+            document.getElementById('cultivosTable').classList.remove('hidden');
+        });
+        document.getElementById('nav-cosecha').addEventListener('click', () => {
+            showView('cosecha-view');
+            renderCosechasTable();
+            document.getElementById('cosechaForm').classList.add('hidden');
+            document.getElementById('cosechasTable').classList.remove('hidden');
+        });
+        document.getElementById('nav-medicion').addEventListener('click', () => {
+            showView('medicion-view');
+            renderMedicionesTable();
+            document.getElementById('medicionForm').classList.add('hidden');
+            document.getElementById('medicionesTable').classList.remove('hidden');
+        });
+        document.getElementById('nav-costos').addEventListener('click', () => {
+            showView('costos-view');
+            renderCostos();
+        });
+        document.getElementById('nav-trazabilidad').addEventListener('click', () => showView('trazabilidad-view'));
+        document.getElementById('nav-notifications').addEventListener('click', () => {
+            showView('notifications-view');
+            renderNotifications();
+        });
+        document.getElementById('nav-charts').addEventListener('click', () => {
+            showView('charts-view');
+            renderChart();
+        });
+
+        // Add New buttons for Forms
+        document.getElementById('add-new-btn').addEventListener('click', () => {
+            const currentView = document.querySelector('.main-content > #content-views > section:not(.hidden)').id;
+            if (currentView === 'inventario-view') {
+                document.getElementById('inventarioTable').classList.add('hidden');
+                document.getElementById('inventarioForm').classList.remove('hidden');
+                document.getElementById('movimientoForm').classList.add('hidden');
+            } else if (currentView === 'cultivo-view') {
+                document.getElementById('cultivosTable').classList.add('hidden');
+                document.getElementById('cultivoForm').classList.remove('hidden');
+            } else if (currentView === 'cosecha-view') {
+                document.getElementById('cosechasTable').classList.add('hidden');
+                document.getElementById('cosechaForm').classList.remove('hidden');
+            } else if (currentView === 'medicion-view') {
+                document.getElementById('medicionesTable').classList.add('hidden');
+                document.getElementById('medicionForm').classList.remove('hidden');
+            }
+        });
+        
+        // ===========================================================================================================================
+        // DARK MODE FUNCTIONALITY
+        // ===========================================================================================================================
+        const toggleTheme = () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeIcons(isDark);
+            if (!document.getElementById('charts-view').classList.contains('hidden')) {
+                renderChart();
+            }
+        };
+
+        const updateThemeIcons = (isDark) => {
+            const sunIcons = document.querySelectorAll('#sun-icon, #sun-icon-mobile');
+            const moonIcons = document.querySelectorAll('#moon-icon, #moon-icon-mobile');
+            if (isDark) {
+                sunIcons.forEach(icon => icon.classList.remove('hidden'));
+                moonIcons.forEach(icon => icon.classList.add('hidden'));
+            } else {
+                sunIcons.forEach(icon => icon.classList.add('hidden'));
+                moonIcons.forEach(icon => icon.classList.remove('hidden'));
+            }
+        };
+
+        document.getElementById('nav-theme').addEventListener('click', toggleTheme);
+        document.getElementById('theme-toggle-mobile').addEventListener('click', toggleTheme);
+
+        // Mobile sidebar toggle
+        document.getElementById('burger-menu').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('main-content').classList.toggle('active');
+        });
+
+        // ===========================================================================================================================
+        // DATA MANAGEMENT & RENDER FUNCTIONS
+        // ===========================================================================================================================
+
+        let currentEditingItem = null;
+
+        const updateDashboard = () => {
+            const cultivos = getFromLocalStorage('cultivos');
+            const cosechas = getFromLocalStorage('cosechas');
+            const costosFijos = getFromLocalStorage('costos-fijos');
+            const costosVariables = getFromLocalStorage('costos-variables');
+            const movimientos = getFromLocalStorage('inventario-movimientos');
+
+            document.getElementById('total-cultivos').textContent = cultivos.length;
+
+            const totalCosecha = cosechas.reduce((sum, c) => sum + (c.pesoCosecha || 0), 0);
+            document.getElementById('total-cosechado').textContent = `${totalCosecha.toFixed(2)} g`;
+            
+            let totalCostos = costosFijos.reduce((sum, c) => sum + (c.monto || 0), 0) + costosVariables.reduce((sum, c) => sum + (c.monto || 0), 0);
+            // Add costs from inventory movements
+            const inventario = getFromLocalStorage('inventario');
+            movimientos.forEach(mov => {
+                if (mov.tipo === 'gasto') {
+                    const insumo = inventario.find(i => i.nombre === mov.insumo);
+                    if (insumo && insumo.costo) {
+                         totalCostos += mov.cantidad * insumo.costo;
+                    }
+                }
+            });
+
+            document.getElementById('total-costos').textContent = `${totalCostos.toFixed(2)} $`;
+        };
+
+        // Inventario
+        const renderInventarioTable = () => {
+            const inventario = getFromLocalStorage('inventario');
+            const tbody = document.getElementById('inventario-body');
+            tbody.innerHTML = '';
+            inventario.forEach((insumo, index) => {
+                const isLowStock = insumo.stock <= insumo.stockMinimo;
+                const vencimiento = insumo.vencimiento ? new Date(insumo.vencimiento).toLocaleDateString() : 'N/A';
+                const tr = document.createElement('tr');
+                tr.className = isLowStock ? 'bg-red-100 dark:bg-red-800' : '';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${isLowStock ? 'text-red-900 dark:text-red-100' : 'text-gray-900 dark:text-white'}">${insumo.nombre}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${insumo.tipo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${isLowStock ? 'text-red-700 dark:text-red-200 font-bold' : 'text-gray-500 dark:text-gray-400'}">${insumo.stock} ${insumo.unidad}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${insumo.stockMinimo} ${insumo.unidad}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${vencimiento}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editInventario(${index})" class="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 ml-2">Editar</button>
+                        <button onclick="deleteItem('inventario', ${index}, renderInventarioTable)" class="text-red-600 hover:text-red-900 dark:hover:text-red-400 ml-2">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if (inventario.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500 dark:text-gray-400">No hay insumos registrados.</td></tr>`;
+            }
+        };
+
+        const editInventario = (index) => {
+            const inventario = getFromLocalStorage('inventario');
+            currentEditingItem = { key: 'inventario', index: index, data: inventario[index] };
+            document.getElementById('showInventarioFormBtn').click();
+            document.getElementById('insumo-nombre').value = inventario[index].nombre;
+            document.getElementById('insumo-tipo').value = inventario[index].tipo;
+            document.getElementById('insumo-stock').value = inventario[index].stock;
+            document.getElementById('insumo-unidad').value = inventario[index].unidad;
+            document.getElementById('insumo-stock-minimo').value = inventario[index].stockMinimo;
+            document.getElementById('insumo-vencimiento').value = inventario[index].vencimiento;
+            document.getElementById('insumo-imagen').value = inventario[index].imagen;
+        };
+
+        const renderMovimientoSelect = () => {
+            const inventario = getFromLocalStorage('inventario');
+            const select = document.getElementById('movimiento-insumo');
+            select.innerHTML = '<option value="">Seleccione un insumo</option>';
+            inventario.forEach(insumo => {
+                const option = document.createElement('option');
+                option.value = insumo.nombre;
+                option.textContent = `${insumo.nombre} (${insumo.stock} ${insumo.unidad})`;
+                select.appendChild(option);
+            });
+        };
+
+        // Cultivos
+        const renderCultivosTable = () => {
+            const cultivos = getFromLocalStorage('cultivos');
+            const tbody = document.getElementById('cultivos-body');
+            tbody.innerHTML = '';
+            cultivos.forEach((cultivo, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${cultivo.idCultivo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${cultivo.fechaInicio}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${cultivo.ubicacion}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editCultivo(${index})" class="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 ml-2">Editar</button>
+                        <button onclick="deleteItem('cultivos', ${index}, renderCultivosTable)" class="text-red-600 hover:text-red-900 dark:hover:text-red-400 ml-2">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if (cultivos.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500 dark:text-gray-400">No hay cultivos registrados.</td></tr>`;
+            }
+        };
+        
+        const editCultivo = (index) => {
+            const cultivos = getFromLocalStorage('cultivos');
+            currentEditingItem = { key: 'cultivos', index: index, data: cultivos[index] };
+            document.getElementById('nav-cultivo').click();
+            document.getElementById('cultivosTable').classList.add('hidden');
+            document.getElementById('cultivoForm').classList.remove('hidden');
+            document.getElementById('cultivo-id').value = cultivos[index].idCultivo;
+            document.getElementById('fecha-inicio').value = cultivos[index].fechaInicio;
+            document.getElementById('ubicacion').value = cultivos[index].ubicacion;
+            document.getElementById('especie').value = cultivos[index].especie;
+            document.getElementById('cantidad-bolsas').value = cultivos[index].cantidadBolsas;
+            document.getElementById('volumen-sustrato').value = cultivos[index].volumenSustrato;
+            document.getElementById('sustrato-tipo').value = cultivos[index].sustratoTipo;
+            document.getElementById('sustrato-humedad').value = cultivos[index].sustratoHumedad;
+            document.getElementById('sustrato-ph').value = cultivos[index].sustratoPh;
+            document.getElementById('notas-cultivo').value = cultivos[index].notas;
+        };
+
+        // Cosechas
+        const renderCosechasTable = () => {
+            const cosechas = getFromLocalStorage('cosechas');
+            const tbody = document.getElementById('cosechas-body');
+            tbody.innerHTML = '';
+            cosechas.forEach((cosecha, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${cosecha.idCultivo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${cosecha.fechaCosecha}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${cosecha.pesoCosecha} g</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${cosecha.calidad}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editCosecha(${index})" class="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 ml-2">Editar</button>
+                        <button onclick="deleteItem('cosechas', ${index}, renderCosechasTable)" class="text-red-600 hover:text-red-900 dark:hover:text-red-400 ml-2">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if (cosechas.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500 dark:text-gray-400">No hay cosechas registradas.</td></tr>`;
+            }
+        };
+
+        const editCosecha = (index) => {
+            const cosechas = getFromLocalStorage('cosechas');
+            currentEditingItem = { key: 'cosechas', index: index, data: cosechas[index] };
+            document.getElementById('nav-cosecha').click();
+            document.getElementById('cosechasTable').classList.add('hidden');
+            document.getElementById('cosechaForm').classList.remove('hidden');
+            document.getElementById('cosecha-id-cultivo').value = cosechas[index].idCultivo;
+            document.getElementById('cosecha-fecha-cosecha').value = cosechas[index].fechaCosecha;
+            document.getElementById('peso-cosecha').value = cosechas[index].pesoCosecha;
+            document.getElementById('calidad').value = cosechas[index].calidad;
+            document.getElementById('notas-cosecha').value = cosechas[index].notas;
+        };
+        
+        // Mediciones
+        const renderMedicionesTable = () => {
+            const mediciones = getFromLocalStorage('mediciones');
+            const tbody = document.getElementById('mediciones-body');
+            tbody.innerHTML = '';
+            mediciones.forEach((medicion, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${medicion.idCultivo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${medicion.fechaMedicion}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${medicion.temperatura}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${medicion.humedad}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editMedicion(${index})" class="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 ml-2">Editar</button>
+                        <button onclick="deleteItem('mediciones', ${index}, renderMedicionesTable)" class="text-red-600 hover:text-red-900 dark:hover:text-red-400 ml-2">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if (mediciones.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500 dark:text-gray-400">No hay mediciones registradas.</td></tr>`;
+            }
+        };
+
+        const editMedicion = (index) => {
+            const mediciones = getFromLocalStorage('mediciones');
+            currentEditingItem = { key: 'mediciones', index: index, data: mediciones[index] };
+            document.getElementById('nav-medicion').click();
+            document.getElementById('medicionesTable').classList.add('hidden');
+            document.getElementById('medicionForm').classList.remove('hidden');
+            document.getElementById('medicion-id-cultivo').value = mediciones[index].idCultivo;
+            document.getElementById('fecha-medicion').value = mediciones[index].fechaMedicion;
+            document.getElementById('temperatura').value = mediciones[index].temperatura;
+            document.getElementById('humedad').value = mediciones[index].humedad;
+            document.getElementById('co2').value = mediciones[index].co2;
+            document.getElementById('iluminacion').value = mediciones[index].iluminacion;
+        };
+
+        // Costos
+        const renderCostos = () => {
+            const costosFijos = getFromLocalStorage('costos-fijos');
+            const costosVariables = getFromLocalStorage('costos-variables');
+            const fijosList = document.getElementById('fijos-list');
+            const variablesList = document.getElementById('variables-list');
+
+            fijosList.innerHTML = '';
+            costosFijos.forEach((costo, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center bg-white dark:bg-gray-800 p-2 rounded-md';
+                li.innerHTML = `
+                    <span>${costo.nombre}: ${costo.monto} $</span>
+                    <button onclick="deleteItem('costos-fijos', ${index}, renderCostos)" class="text-red-500 hover:text-red-700">
+                        <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 11-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd"></path></svg>
+                    </button>
+                `;
+                fijosList.appendChild(li);
+            });
+
+            variablesList.innerHTML = '';
+            costosVariables.forEach((costo, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center bg-white dark:bg-gray-800 p-2 rounded-md';
+                li.innerHTML = `
+                    <span>${costo.nombre}: ${costo.monto} $</span>
+                    <button onclick="deleteItem('costos-variables', ${index}, renderCostos)" class="text-red-500 hover:text-red-700">
+                        <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 11-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd"></path></svg>
+                    </button>
+                `;
+                variablesList.appendChild(li);
+            });
+        };
+
+        // Notifications
+        const renderNotifications = () => {
+            const notificationsList = document.getElementById('notifications-list');
+            notificationsList.innerHTML = '';
+            const noNotificationsMessage = document.getElementById('no-notifications-message');
+
+            const inventario = getFromLocalStorage('inventario');
+            const alerts = [];
+
+            inventario.forEach(insumo => {
+                // Low stock alert
+                if (insumo.stock <= insumo.stockMinimo) {
+                    alerts.push({ type: 'warning', message: `¡Alerta! El insumo "${insumo.nombre}" tiene un stock bajo de ${insumo.stock} ${insumo.unidad}.` });
+                }
+                // Expiration date alert (e.g., within 30 days)
+                if (insumo.vencimiento) {
+                    const today = new Date();
+                    const vencimientoDate = new Date(insumo.vencimiento);
+                    const diffTime = vencimientoDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays <= 30 && diffDays > 0) {
+                        alerts.push({ type: 'warning', message: `¡Atención! El insumo "${insumo.nombre}" vence en ${diffDays} días.` });
+                    }
+                    if (diffDays <= 0) {
+                        alerts.push({ type: 'danger', message: `¡Crítico! El insumo "${insumo.nombre}" ha vencido.` });
+                    }
+                }
+            });
+
+            if (alerts.length > 0) {
+                noNotificationsMessage.classList.add('hidden');
+                alerts.forEach(alert => {
+                    const div = document.createElement('div');
+                    let bgColorClass = alert.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-800' : 'bg-red-100 dark:bg-red-800';
+                    let textColorClass = alert.type === 'warning' ? 'text-yellow-800 dark:text-yellow-100' : 'text-red-800 dark:text-red-100';
+                    div.className = `${bgColorClass} p-4 rounded-lg flex items-center space-x-3`;
+                    div.innerHTML = `
+                        <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-12a1 1 0 10-2 0v4a1 1 0 102 0V6zm0 6a1 1 0 10-2 0h2z" clip-rule="evenodd"></path>
+                        </svg>
+                        <p class="font-medium ${textColorClass}">${alert.message}</p>
+                    `;
+                    notificationsList.appendChild(div);
+                });
+                document.getElementById('notification-count').textContent = alerts.length;
+            } else {
+                noNotificationsMessage.classList.remove('hidden');
+                document.getElementById('notification-count').textContent = '0';
+            }
+        };
+
+        // Charts
+        let myChart;
+        const renderChart = (filterCultivoId = '') => {
+            const mediciones = getFromLocalStorage('mediciones');
+            let filteredMediciones = mediciones;
+
+            if (filterCultivoId) {
+                filteredMediciones = mediciones.filter(m => m.idCultivo === filterCultivoId);
+            }
+            
+            const uniqueCultivoIds = [...new Set(mediciones.map(m => m.idCultivo))];
+            const select = document.getElementById('chart-cultivo-id');
+            // Populate select options only if they don't exist
+            if (select.options.length === 1) {
+                uniqueCultivoIds.forEach(id => {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = `Cultivo ID: ${id}`;
+                    select.appendChild(option);
+                });
+            }
+            select.value = filterCultivoId;
+
+            filteredMediciones.sort((a, b) => new Date(a.fechaMedicion) - new Date(b.fechaMedicion));
+
+            const labels = filteredMediciones.map(m => m.fechaMedicion);
+            const temperatures = filteredMediciones.map(m => m.temperatura);
+            const humidities = filteredMediciones.map(m => m.humedad);
+            const co2s = filteredMediciones.map(m => m.co2);
+            const illuminations = filteredMediciones.map(m => m.iluminacion);
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            const fontColor = isDark ? '#ffffff' : '#333333';
+
+            if (myChart) { myChart.destroy(); }
+            
+            const ctx = document.getElementById('medicionesChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Temperatura (°C)', data: temperatures, borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, yAxisID: 'yTemp' },
+                        { label: 'Humedad (%)', data: humidities, borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, yAxisID: 'yHumidity' },
+                        { label: 'CO2 (ppm)', data: co2s, borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, yAxisID: 'yCO2' },
+                        { label: 'Iluminación (h)', data: illuminations, borderColor: 'rgb(255, 205, 86)', backgroundColor: 'rgba(255, 205, 86, 0.2)', tension: 0.1, yAxisID: 'yIllumination' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: fontColor }, grid: { color: gridColor } },
+                        yTemp: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Temperatura (°C)', color: fontColor }, ticks: { color: fontColor }, grid: { color: gridColor } },
+                        yHumidity: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Humedad (%)', color: fontColor }, ticks: { color: fontColor }, grid: { drawOnChartArea: false } },
+                        yCO2: { type: 'linear', display: false, position: 'right', title: { display: true, text: 'CO2 (ppm)', color: fontColor }, ticks: { color: fontColor }, grid: { drawOnChartArea: false } },
+                        yIllumination: { type: 'linear', display: false, position: 'right', title: { display: true, text: 'Iluminación (h)', color: fontColor }, ticks: { color: fontColor }, grid: { drawOnChartArea: false } }
+                    },
+                    plugins: { legend: { labels: { color: fontColor } } }
+                }
+            });
+        };
+        document.getElementById('chart-cultivo-id').addEventListener('change', (e) => renderChart(e.target.value));
+
+        // Delete function
+        window.deleteItem = (key, index, renderFunction) => {
+            const items = getFromLocalStorage(key);
+            items.splice(index, 1);
+            saveToLocalStorage(key, items);
+            showModal('Éxito', 'Registro eliminado correctamente.', () => {
+                renderFunction();
+                updateDashboard();
+                renderNotifications();
+            });
+        };
+
+        // ===========================================================================================================================
+        // FORM SUBMISSION HANDLERS
+        // ===========================================================================================================================
+
+        document.getElementById('inventarioForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const insumo = {
+                nombre: document.getElementById('insumo-nombre').value,
+                tipo: document.getElementById('insumo-tipo').value,
+                stock: parseFloat(document.getElementById('insumo-stock').value),
+                unidad: document.getElementById('insumo-unidad').value,
+                stockMinimo: parseFloat(document.getElementById('insumo-stock-minimo').value),
+                vencimiento: document.getElementById('insumo-vencimiento').value,
+                imagen: document.getElementById('insumo-imagen').value,
+                costo: 0 // Will add logic to track cost later
+            };
+            let inventario = getFromLocalStorage('inventario');
+            if (currentEditingItem && currentEditingItem.key === 'inventario') {
+                inventario[currentEditingItem.index] = insumo;
+            } else {
+                inventario.push(insumo);
+            }
+            saveToLocalStorage('inventario', inventario);
+            showModal('Éxito', 'Insumo guardado correctamente.', () => {
+                document.getElementById('inventarioForm').reset();
+                currentEditingItem = null;
+                showView('inventario-view');
+                renderInventarioTable();
+                renderMovimientoSelect();
+                renderNotifications();
+            });
+        });
+
+        document.getElementById('movimientoForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const movimiento = {
+                insumo: document.getElementById('movimiento-insumo').value,
+                tipo: document.getElementById('movimiento-tipo').value,
+                cantidad: parseFloat(document.getElementById('movimiento-cantidad').value),
+                fecha: document.getElementById('movimiento-fecha').value,
+            };
+            let inventario = getFromLocalStorage('inventario');
+            const insumoIndex = inventario.findIndex(i => i.nombre === movimiento.insumo);
+            if (insumoIndex === -1) {
+                 showModal('Error', 'Insumo no encontrado.');
+                 return;
+            }
+            if (movimiento.tipo === 'gasto' && inventario[insumoIndex].stock < movimiento.cantidad) {
+                showModal('Error', `Stock insuficiente para el gasto. Stock actual: ${inventario[insumoIndex].stock} ${inventario[insumoIndex].unidad}.`);
+                return;
+            }
+            if (movimiento.tipo === 'alta') {
+                inventario[insumoIndex].stock += movimiento.cantidad;
+            } else if (movimiento.tipo === 'gasto') {
+                inventario[insumoIndex].stock -= movimiento.cantidad;
+            }
+            saveToLocalStorage('inventario', inventario);
+            showModal('Éxito', 'Movimiento registrado correctamente.', () => {
+                document.getElementById('movimientoForm').reset();
+                showView('inventario-view');
+                renderInventarioTable();
+                renderMovimientoSelect();
+                renderNotifications();
+            });
+        });
+
+        document.getElementById('cultivoForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                idCultivo: document.getElementById('cultivo-id').value,
+                fechaInicio: document.getElementById('fecha-inicio').value,
+                ubicacion: document.getElementById('ubicacion').value,
+                especie: document.getElementById('especie').value,
+                cantidadBolsas: parseInt(document.getElementById('cantidad-bolsas').value),
+                volumenSustrato: parseFloat(document.getElementById('volumen-sustrato').value),
+                sustratoTipo: document.getElementById('sustrato-tipo').value,
+                sustratoHumedad: parseFloat(document.getElementById('sustrato-humedad').value),
+                sustratoPh: parseFloat(document.getElementById('sustrato-ph').value),
+                notas: document.getElementById('notas-cultivo').value,
+            };
+            let cultivos = getFromLocalStorage('cultivos');
+            if (currentEditingItem && currentEditingItem.key === 'cultivos') {
+                cultivos[currentEditingItem.index] = data;
+            } else {
+                cultivos.push(data);
+            }
+            saveToLocalStorage('cultivos', cultivos);
+            showModal('Éxito', `Cultivo ${data.idCultivo} guardado correctamente.`, () => {
+                document.getElementById('cultivoForm').reset();
+                currentEditingItem = null;
+                showView('cultivo-view');
+                renderCultivosTable();
+                updateDashboard();
+            });
+        });
+
+        document.getElementById('cosechaForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                idCultivo: document.getElementById('cosecha-id-cultivo').value,
+                fechaCosecha: document.getElementById('cosecha-fecha-cosecha').value,
+                pesoCosecha: parseFloat(document.getElementById('peso-cosecha').value),
+                calidad: document.getElementById('calidad').value,
+                notas: document.getElementById('notas-cosecha').value,
+            };
+            let cosechas = getFromLocalStorage('cosechas');
+            if (currentEditingItem && currentEditingItem.key === 'cosechas') {
+                cosechas[currentEditingItem.index] = data;
+            } else {
+                cosechas.push(data);
+            }
+            saveToLocalStorage('cosechas', cosechas);
+            showModal('Éxito', 'Cosecha guardada correctamente.', () => {
+                document.getElementById('cosechaForm').reset();
+                currentEditingItem = null;
+                showView('cosecha-view');
+                renderCosechasTable();
+                updateDashboard();
+            });
+        });
+
+        document.getElementById('medicionForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                idCultivo: document.getElementById('medicion-id-cultivo').value,
+                fechaMedicion: document.getElementById('fecha-medicion').value,
+                temperatura: parseFloat(document.getElementById('temperatura').value),
+                humedad: parseFloat(document.getElementById('humedad').value),
+                co2: parseInt(document.getElementById('co2').value),
+                iluminacion: parseFloat(document.getElementById('iluminacion').value),
+            };
+            let mediciones = getFromLocalStorage('mediciones');
+            if (currentEditingItem && currentEditingItem.key === 'mediciones') {
+                mediciones[currentEditingItem.index] = data;
+            } else {
+                mediciones.push(data);
+            }
+            saveToLocalStorage('mediciones', mediciones);
+            showModal('Éxito', 'Medición guardada correctamente.', () => {
+                document.getElementById('medicionForm').reset();
+                currentEditingItem = null;
+                showView('medicion-view');
+                renderMedicionesTable();
+                updateDashboard();
+            });
+        });
+
+        document.getElementById('fijosForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                nombre: document.getElementById('costo-fijo-nombre').value,
+                monto: parseFloat(document.getElementById('costo-fijo-monto').value),
+            };
+            let costosFijos = getFromLocalStorage('costos-fijos');
+            costosFijos.push(data);
+            saveToLocalStorage('costos-fijos', costosFijos);
+            showModal('Éxito', 'Costo fijo guardado.', () => {
+                document.getElementById('fijosForm').reset();
+                renderCostos();
+                updateDashboard();
+            });
+        });
+
+        document.getElementById('variablesForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                nombre: document.getElementById('costo-variable-nombre').value,
+                monto: parseFloat(document.getElementById('costo-variable-monto').value),
+            };
+            let costosVariables = getFromLocalStorage('costos-variables');
+            costosVariables.push(data);
+            saveToLocalStorage('costos-variables', costosVariables);
+            showModal('Éxito', 'Costo variable guardado.', () => {
+                document.getElementById('variablesForm').reset();
+                renderCostos();
+                updateDashboard();
+            });
+        });
+        
+        // ===========================================================================================================================
+        // INITIALIZATION
+        // ===========================================================================================================================
+        window.onload = function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                updateThemeIcons(true);
+            } else {
+                updateThemeIcons(false);
+            }
+            showView('dashboard-view');
+            updateDashboard();
+            renderNotifications();
+        };
+
+        // UI toggles
+        document.getElementById('showInventarioFormBtn').addEventListener('click', () => {
+            document.getElementById('inventarioTable').classList.add('hidden');
+            document.getElementById('inventarioForm').classList.remove('hidden');
+            document.getElementById('movimientoForm').classList.add('hidden');
+        });
+        document.getElementById('showInventarioTableBtn').addEventListener('click', () => {
+            document.getElementById('inventarioForm').classList.add('hidden');
+            document.getElementById('inventarioTable').classList.remove('hidden');
+            document.getElementById('movimientoForm').classList.add('hidden');
+            renderInventarioTable();
+        });
+        document.getElementById('showMovimientoFormBtn').addEventListener('click', () => {
+            document.getElementById('inventarioForm').classList.add('hidden');
+            document.getElementById('inventarioTable').classList.add('hidden');
+            document.getElementById('movimientoForm').classList.remove('hidden');
+            renderMovimientoSelect();
+        });
+    </script>
+</body>
+</html>
